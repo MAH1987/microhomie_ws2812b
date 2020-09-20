@@ -87,7 +87,7 @@ async def fill_fluid_rainbow(self):
                 set_led(self.np, l, color)
                 if self.rainbow_property.data != 'Fluid Rainbow':
                     break
-
+            await asyncio.sleep_ms(5)
             if self.rainbow_property.data != 'Fluid Rainbow':
                 break
     finally:
