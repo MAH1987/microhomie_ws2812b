@@ -46,14 +46,14 @@ def convert_str_to_rgb(rgb_str):
 def fill_solid_rainbow(self):
     leds = settings.LEDS
     deltahue = 1 / leds
-    b = int(4 + 3.1 * (self._brightness + 1) ** 2)
+    b = self._brightness
     r = range(leds)
     for l in r:
         rgb = list(colorsys.hsv_to_rgb(deltahue * l, 1, 1))
         color = (
-            int(b * rgb[0] / 255),
-            int(b * rgb[1] / 255),
-            int(b * rgb[2] / 255)
+            int( b * (rgb[0] * 255) / 255 ),
+            int( b * (rgb[1] * 255) / 255 ),
+            int( b * (rgb[2] * 255) / 255 )
         )
         set_led(self.np, l, color)
 
@@ -61,14 +61,14 @@ async def fill_fluid_rainbow(self):
     try:
         leds = settings.LEDS
         deltahue = 1 / leds
-        b = int(4 + 3.1 * (self._brightness + 1) ** 2)
+        b = self._brightness
         r = range(leds)
         for l in r:
             rgb = list(colorsys.hsv_to_rgb(deltahue * l, 1, 1))
             color = (
-                int(b * rgb[0] / 255),
-                int(b * rgb[1] / 255),
-                int(b * rgb[2] / 255)
+                int( b * (rgb[0] * 255) / 255 ),
+                int( b * (rgb[1] * 255) / 255 ),
+                int( b * (rgb[2] * 255) / 255 )
             )
             set_led(self.np, l, color)
 
