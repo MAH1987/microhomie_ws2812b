@@ -71,7 +71,6 @@ async def fill_fluid_rainbow(self):
                 int( b * (rgb[2] * 255) / 255 )
             )
             set_led(self.np, l, color)
-
         while True:
             for l in r:
                 if l < (leds - 1):
@@ -87,11 +86,50 @@ async def fill_fluid_rainbow(self):
                 set_led(self.np, l, color)
                 if self.rainbow_property.data != 'Fluid Rainbow':
                     break
-            await asyncio.sleep_ms(5)
+            await asyncio.sleep_ms(1)
             if self.rainbow_property.data != 'Fluid Rainbow':
                 break
     finally:
         pass
+
+async def fill_effect(self, effect):
+    try:
+        leds = settings.LEDS
+        r = range(leds)
+        heaps = [
+            (0, 0, 0),
+            (46, 18, 0),
+            (96, 113, 0),
+            (108, 142, 3),
+            (119, 175, 17),
+            (146, 213, 44),
+            (174, 255, 82),
+            (188, 255, 115)
+        ]
+        hr = range(len(heaps))
+
+        for l in r:
+            color = (
+                int( 0 ),
+                int( 0 ),
+                int( 0 )
+            )
+            set_led(self.np, l, color)
+        l = 0
+        while True:
+            for c in hr:
+                set_led(self.np, l, heaps[c-1])
+                l += 1
+                if l >= leds:
+                    l = 0
+                if self.rainbow_property.data != 'Lava':
+                    break
+            await asyncio.sleep_ms(15)
+            if self.rainbow_property.data != 'Lava':
+                break
+    finally:
+        pass
+
 
 class AmbientLight(HomieNode):
     def __init__(self, pin=settings.DATA_PIN, leds=settings.LEDS):
@@ -137,7 +175,7 @@ class AmbientLight(HomieNode):
             settable=True,
             datatype=ENUM,
             restore=False,
-            format="Aus,Solid Rainbow,Fluid Rainbow,Demo",
+            format="Aus,Solid Rainbow,Fluid Rainbow,Demo,Lava",
             default='Aus'
         )
         self.add_property(self.rainbow_property, self.on_rainbow_msg)
@@ -151,7 +189,9 @@ class AmbientLight(HomieNode):
         v = min(max(val, 0), 8)
         self._brightness = int(4 + 3.1 * (v + 1) ** 2)
 
-        if self.power_property.data == TRUE:
+        if self.rainbow_property.data == 'Solid Rainbow':
+            fill_solid_rainbow(self)
+        elif self.power_property.data == TRUE:
             rgb = convert_str_to_rgb(self.color_property.data)
             self.on(rgb=rgb)
 
@@ -179,6 +219,7 @@ class AmbientLight(HomieNode):
         rgb = convert_str_to_rgb(payload)
         if rgb is not None:
             self.color_property.data = payload
+            self.rainbow_property.data = 'Aus'
             if self.power_property.data == TRUE:
                 self.on(rgb=rgb)
 
@@ -197,10 +238,18 @@ class AmbientLight(HomieNode):
                 self.rainbow_property.data = rainbow_type
                 fill_solid_rainbow(self)
                 return
+
             elif rainbow_type == 'Fluid Rainbow':
                 self.rainbow_property.data = rainbow_type
                 self._task = asyncio.create_task(fill_fluid_rainbow(self))
                 return
+
+            elif rainbow_type == 'Lava':
+                self.rainbow_property.data = rainbow_type
+                self._task = asyncio.create_task(fill_effect(self, 'Lava'))
+
+                return
+
             elif rainbow_type == 'Demo':
                 print('Demo')
                 n = self.np.n
@@ -220,11 +269,13 @@ class AmbientLight(HomieNode):
                     self.np[i] = (0, 0, 0)
                 self.np.write()
                 return
+
             else:
                 self.rainbow_property.data = rainbow_type
                 rgb = convert_str_to_rgb(self.color_property.data)
                 self.on(rgb=rgb)                
                 return
+
         except ValueError:
             pass
 
