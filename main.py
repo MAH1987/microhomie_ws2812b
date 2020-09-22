@@ -5,7 +5,7 @@ import uasyncio as asyncio
 import time
 
 from machine import Pin
-
+from uasyncio import sleep_ms
 
 from homie.node import HomieNode
 from homie.device import HomieDevice
@@ -43,59 +43,52 @@ def convert_str_to_rgb(rgb_str):
     except (ValueError, TypeError):
         return None
 
-def fill_solid_rainbow(self):
-    leds = settings.LEDS
-    deltahue = 1 / leds
-    b = self._brightness
-    r = range(leds)
-    for l in r:
-        rgb = list(colorsys.hsv_to_rgb(deltahue * l, 1, 1))
+def fill_solid_rainbow(cls):
+    b = cls._brightness
+    n = cls.np.n
+    for l in cls._range:
+        rgb = list(colorsys.hsv_to_rgb(cls._deltahue * l, 1, 1))
         color = (
             int( b * (rgb[0] * 255) / 255 ),
             int( b * (rgb[1] * 255) / 255 ),
             int( b * (rgb[2] * 255) / 255 )
         )
-        set_led(self.np, l, color)
+        n[i] = color
+        n.write()
 
-async def fill_fluid_rainbow(self):
+async def fill_fluid_rainbow(cls):
+    n = cls.np.n
+    b = cls._brightness
+    led = cls._leds
     try:
-        leds = settings.LEDS
-        deltahue = 1 / leds
-        b = self._brightness
-        r = range(leds)
-        for l in r:
-            rgb = list(colorsys.hsv_to_rgb(deltahue * l, 1, 1))
+        for l in cls._range:
+            rgb = list(colorsys.hsv_to_rgb(cls._deltahue * l, 1, 1))
             color = (
                 int( b * (rgb[0] * 255) / 255 ),
                 int( b * (rgb[1] * 255) / 255 ),
                 int( b * (rgb[2] * 255) / 255 )
             )
-            set_led(self.np, l, color)
+            n[l] = color
         while True:
-            for l in r:
-                if l < (leds - 1):
-                    rgb = self.np[l+1]
+            for l in cls._range:
+                if l < (led - 1):
+                    rgb = n[l+1]
                 else:
-                    rgb = self.np[0]
+                    rgb = n[0]
 
-                color = (
-                    int(rgb[0]),
-                    int(rgb[1]),
-                    int(rgb[2])
-                )
-                set_led(self.np, l, color)
-                if self.rainbow_property.data != 'Fluid Rainbow':
+                n[l] = rgb
+                if cls.rainbow_property.data != 'Fluid Rainbow':
                     break
-            await asyncio.sleep_ms(1)
-            if self.rainbow_property.data != 'Fluid Rainbow':
+                await sleep_ms(1)
+            if cls.rainbow_property.data != 'Fluid Rainbow':
                 break
     finally:
         pass
 
-async def fill_effect(self, effect):
+async def fill_effect(cls, effect):
+    n = cls.np
+    l = cls._leds
     try:
-        leds = settings.LEDS
-        r = range(leds)
         heaps = [
             (0, 0, 0),
             (46, 18, 0),
@@ -108,24 +101,24 @@ async def fill_effect(self, effect):
         ]
         hr = range(len(heaps))
 
-        for l in r:
+        for l in cls._range:
             color = (
                 int( 0 ),
                 int( 0 ),
                 int( 0 )
             )
-            set_led(self.np, l, color)
+            n[l] = color
         l = 0
         while True:
             for c in hr:
-                set_led(self.np, l, heaps[c-1])
+                n[l] = heaps[c-1]
                 l += 1
-                if l >= leds:
+                if l >= l:
                     l = 0
-                if self.rainbow_property.data != 'Lava':
+                if cls.rainbow_property.data != 'Lava':
                     break
             await asyncio.sleep_ms(15)
-            if self.rainbow_property.data != 'Lava':
+            if cls.rainbow_property.data != 'Lava':
                 break
     finally:
         pass
@@ -136,10 +129,20 @@ class AmbientLight(HomieNode):
         super().__init__(
             id="light", name="Desklamp", type="WS2812B"
         )
+        ##############################
+        # define basic vars
+        ##############################
         self._brightness = 4
-
-        self.np = neopixel.NeoPixel(Pin(pin), leds)
-
+        self._leds = settings.LEDS
+        self._deltahue = 1 / self._leds
+        self._range = range(self._leds)
+        ##############################
+        # define neopixels
+        ##############################
+        self.np = neopixel.NeoPixel(Pin(pin), self._leds)
+        ##############################
+        # define probertiys
+        ##############################
         self.power_property = HomieNodeProperty(
             id="power",
             name="Light power",
@@ -181,79 +184,63 @@ class AmbientLight(HomieNode):
         self.add_property(self.rainbow_property, self.on_rainbow_msg)
         
     @property
-    def brightness(self):
-        return self._brightness
+    def brightness(cls):
+        return cls._brightness
 
     @brightness.setter
-    def brightness(self, val):
+    def brightness(cls, val):
         v = min(max(val, 0), 8)
-        self._brightness = int(4 + 3.1 * (v + 1) ** 2)
+        cls._brightness = int(4 + 3.1 * (v + 1) ** 2)
 
-        if self.rainbow_property.data == 'Solid Rainbow':
-            fill_solid_rainbow(self)
-        elif self.power_property.data == TRUE:
-            rgb = convert_str_to_rgb(self.color_property.data)
-            self.on(rgb=rgb)
+        if cls.rainbow_property.data == 'Solid Rainbow':
+            fill_solid_rainbow(cls)
+        elif cls.power_property.data == TRUE:
+            rgb = convert_str_to_rgb(cls.color_property.data)
+            cls.on(rgb=rgb)
 
     def on(self, rgb):
         b = self._brightness
         color = (
-            int(b * rgb[0] / 255),
-            int(b * rgb[1] / 255),
-            int(b * rgb[2] / 255)
+            int(self._brightness * rgb[0] / 255),
+            int(self._brightness * rgb[1] / 255),
+            int(self._brightness * rgb[2] / 255)
         )
         all_on(self.np, color=color)
 
-    def on_power_msg(self, topic, payload, retained):
+    def on_power_msg(cls, topic, payload, retained):
+        cls.power_property.data = payload
         if payload == TRUE:
             rgb = convert_str_to_rgb(self.color_property.data)
-            self.on(rgb=rgb)
+            cls.on(rgb=rgb)
         elif payload == FALSE:
-            all_off(self.np)
+            all_off(cls.np)
         else:
             return
 
-        self.power_property.data = payload
-
-    def on_color_msg(self, topic, payload, retained):
+    def on_color_msg(cls, topic, payload, retained):
         rgb = convert_str_to_rgb(payload)
         if rgb is not None:
-            self.color_property.data = payload
-            self.rainbow_property.data = 'Aus'
-            if self.power_property.data == TRUE:
-                self.on(rgb=rgb)
+            cls.rainbow_property.data = 'Aus'
+            if cls.power_property.data == TRUE:
+                cls.on(rgb=rgb)
 
-    def on_brightness_msg(self, topic, payload, retained):
+    def on_rainbow_msg(cls, topic, payload, retained):
         try:
-            b = min(max(int(payload), 1), 8)
-            self.brightness = b
-            self.brightness_property.data = payload
-        except ValueError:
-            pass
-
-    def on_rainbow_msg(self, topic, payload, retained):
-        try:            
-            rainbow_type = payload
-            if rainbow_type == 'Solid Rainbow':            
-                self.rainbow_property.data = rainbow_type
-                fill_solid_rainbow(self)
+            if cls.rainbow_property.value == 'Solid Rainbow':
+                fill_solid_rainbow(cls)
                 return
 
-            elif rainbow_type == 'Fluid Rainbow':
-                self.rainbow_property.data = rainbow_type
-                self._task = asyncio.create_task(fill_fluid_rainbow(self))
+            elif cls.rainbow_property.value == 'Fluid Rainbow':
+                cls._task = asyncio.create_task(fill_fluid_rainbow(cls))
                 return
 
-            elif rainbow_type == 'Lava':
-                self.rainbow_property.data = rainbow_type
-                self._task = asyncio.create_task(fill_effect(self, 'Lava'))
-
+            elif cls.rainbow_property.value == 'Lava':
+                cls._task = asyncio.create_task(fill_effect(cls, 'Lava'))
                 return
 
-            elif rainbow_type == 'Demo':
+            elif cls.rainbow_property.value == 'Demo':
                 print('Demo')
-                n = self.np.n
-
+                n = cls.np.n
                 # fade in/out
                 for i in range(0, 4 * 256, 8):
                     for j in range(n):
@@ -271,9 +258,8 @@ class AmbientLight(HomieNode):
                 return
 
             else:
-                self.rainbow_property.data = rainbow_type
-                rgb = convert_str_to_rgb(self.color_property.data)
-                self.on(rgb=rgb)                
+                rgb = convert_str_to_rgb(cls.color_property.data)
+                cls.on(rgb=rgb)
                 return
 
         except ValueError:
