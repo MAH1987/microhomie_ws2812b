@@ -2,10 +2,8 @@ import neopixel
 import settings
 import colorsys
 import uasyncio as asyncio
-import time
 
 from machine import Pin
-from uasyncio import sleep_ms
 
 from homie.node import HomieNode
 from homie.device import HomieDevice
@@ -101,7 +99,7 @@ async def fill_effect(cls, effect):
             for c in hr:
                 set_led(cls.np, l, heaps[c-1])
                 l += 1
-                if l >= cls._led:
+                if l >= cls._leds:
                     l = 0
                 if cls.rainbow_property.data != 'Lava':
                     break
@@ -171,18 +169,17 @@ class AmbientLight(HomieNode):
         )
         self.add_property(self.rainbow_property, self.on_rainbow_msg)
 
-    def on(self, rgb):
+    def on(cls, rgb):
         color = (
-            int(self._brightness * rgb[0] / 255),
-            int(self._brightness * rgb[1] / 255),
-            int(self._brightness * rgb[2] / 255)
+            int(cls._brightness * rgb[0] / 255),
+            int(cls._brightness * rgb[1] / 255),
+            int(cls._brightness * rgb[2] / 255)
         )
-        all_on(self.np, color=color)
+        all_on(cls.np, color=color)
 
     def on_power_msg(cls, topic, payload, retained):
-        cls.power_property.data = payload
         if payload == TRUE:
-            rgb = convert_str_to_rgb(self.color_property.data)
+            rgb = convert_str_to_rgb(cls.color_property.data)
             cls.on(rgb=rgb)
         elif payload == FALSE:
             all_off(cls.np)
@@ -194,11 +191,12 @@ class AmbientLight(HomieNode):
         if rgb is not None:
             cls.rainbow_property.data = 'Aus'
             if cls.power_property.data == TRUE:
+                cls.on(rgb=rgb)
+
     def on_brightness_msg(cls, topic, payload, retained):
         try:
             v = min(max(int(payload), 1), 8)
             cls._brightness = int(4 + 3.1 * (v + 1) ** 2)
-            cls.brightness_property.data = payload
 
             if cls.rainbow_property.data == 'Solid Rainbow':
                 fill_solid_rainbow(cls)
@@ -208,21 +206,19 @@ class AmbientLight(HomieNode):
         except ValueError:
             pass
 
-
     def on_rainbow_msg(cls, topic, payload, retained):
         try:
-            rainbow_type = payload
-            if rainbow_type == 'Solid Rainbow':
+            if payload == 'Solid Rainbow':
                 fill_solid_rainbow(cls)
                 return
 
-            elif rainbow_type == 'Fluid Rainbow':
+            elif payload == 'Fluid Rainbow':
                 fill_solid_rainbow(cls)
                 cls._task = asyncio.create_task(fill_fluid_rainbow(cls))
 
                 return
 
-            elif cls.rainbow_property.value == 'Lava':
+            elif payload == 'Lava':
                 cls._task = asyncio.create_task(fill_effect(cls, 'Lava'))
                 return
 
@@ -245,9 +241,9 @@ class AmbientLight(HomieNode):
                     cls.np.write()
 
                 # clear
-                for i in range(n):
-                    self.np[i] = (0, 0, 0)
-                self.np.write()
+                for i in cls._range:
+                    cls.np[i] = (0, 0, 0)
+                cls.np.write()
                 return
 
             else:
