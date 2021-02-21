@@ -170,24 +170,8 @@ class AmbientLight(HomieNode):
             default='Aus'
         )
         self.add_property(self.rainbow_property, self.on_rainbow_msg)
-        
-    @property
-    def brightness(cls):
-        return cls._brightness
-
-    @brightness.setter
-    def brightness(cls, val):
-        v = min(max(val, 0), 8)
-        cls._brightness = int(4 + 3.1 * (v + 1) ** 2)
-
-        if cls.rainbow_property.data == 'Solid Rainbow':
-            fill_solid_rainbow(cls)
-        elif cls.power_property.data == TRUE:
-            rgb = convert_str_to_rgb(cls.color_property.data)
-            cls.on(rgb=rgb)
 
     def on(self, rgb):
-        b = self._brightness
         color = (
             int(self._brightness * rgb[0] / 255),
             int(self._brightness * rgb[1] / 255),
@@ -210,7 +194,20 @@ class AmbientLight(HomieNode):
         if rgb is not None:
             cls.rainbow_property.data = 'Aus'
             if cls.power_property.data == TRUE:
+    def on_brightness_msg(cls, topic, payload, retained):
+        try:
+            v = min(max(int(payload), 1), 8)
+            cls._brightness = int(4 + 3.1 * (v + 1) ** 2)
+            cls.brightness_property.data = payload
+
+            if cls.rainbow_property.data == 'Solid Rainbow':
+                fill_solid_rainbow(cls)
+            elif cls.power_property.data == TRUE:
+                rgb = convert_str_to_rgb(cls.color_property.data)
                 cls.on(rgb=rgb)
+        except ValueError:
+            pass
+
 
     def on_rainbow_msg(cls, topic, payload, retained):
         try:
