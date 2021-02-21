@@ -166,7 +166,7 @@ class AmbientLight(HomieNode):
             settable=True,
             datatype=ENUM,
             restore=False,
-            format="Aus,Solid Rainbow,Fluid Rainbow,Demo,Lava",
+            format="Aus,Solid Rainbow,Fluid Rainbow,ColorFade,Lava",
             default='Aus'
         )
         self.add_property(self.rainbow_property, self.on_rainbow_msg)
@@ -226,18 +226,23 @@ class AmbientLight(HomieNode):
                 cls._task = asyncio.create_task(fill_effect(cls, 'Lava'))
                 return
 
-            elif cls.rainbow_property.value == 'Demo':
-                print('Demo')
-                n = cls.np.n
+            elif payload == 'ColorFade':
                 # fade in/out
-                for i in range(0, 4 * 256, 8):
-                    for j in range(n):
+                rgb = convert_str_to_rgb(cls.color_property.data)
+
+                for i in range(0, 1024, 8):
+                    for j in cls._range:
                         if (i // 256) % 2 == 0:
-                            val = i & 0xff
+                            b = i & 0xff
                         else:
-                            val = 255 - (i & 0xff)
-                        self.np[j] = (val, 0, 0)
-                    self.np.write()
+                            b = 255 - (i & 0xff)
+
+                        cls.np[j] = (
+                            int( ( rgb[0] / 255 ) * b ),
+                            int( ( rgb[1] / 255 ) * b ),
+                            int( ( rgb[2] / 255 ) * b )
+                        )
+                    cls.np.write()
 
                 # clear
                 for i in range(n):
