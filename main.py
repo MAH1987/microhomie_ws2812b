@@ -14,7 +14,7 @@ from homie.constants import TRUE, FALSE, BOOLEAN, COLOR, RGB, ENUM, INTEGER
 
 BLACK = (0, 0, 0)
 
-DEFAULT = "159,140,170"
+DEFAULT = "171,20,158"
 
 def all_off(np):
     np.fill(BLACK)
@@ -44,50 +44,38 @@ def convert_str_to_rgb(rgb_str):
         return None
 
 def fill_solid_rainbow(cls):
-    b = cls._brightness
-    n = cls.np.n
-    for l in cls._range:
-        rgb = list(colorsys.hsv_to_rgb(cls._deltahue * l, 1, 1))
-        color = (
-            int( b * (rgb[0] * 255) / 255 ),
-            int( b * (rgb[1] * 255) / 255 ),
-            int( b * (rgb[2] * 255) / 255 )
-        )
-        n[i] = color
-        n.write()
-
-async def fill_fluid_rainbow(cls):
-    n = cls.np.n
-    b = cls._brightness
-    led = cls._leds
     try:
         for l in cls._range:
             rgb = list(colorsys.hsv_to_rgb(cls._deltahue * l, 1, 1))
             color = (
-                int( b * (rgb[0] * 255) / 255 ),
-                int( b * (rgb[1] * 255) / 255 ),
-                int( b * (rgb[2] * 255) / 255 )
+                int( cls._brightness * (rgb[0] * 255) / 255 ),
+                int( cls._brightness * (rgb[1] * 255) / 255 ),
+                int( cls._brightness * (rgb[2] * 255) / 255 )
             )
-            n[l] = color
+            cls.np[l] = color
+        cls.np.write()
+    finally:
+        pass
+
+async def fill_fluid_rainbow(cls):
+    try:
         while True:
             for l in cls._range:
-                if l < (led - 1):
-                    rgb = n[l+1]
+                if l < (cls._leds - 1):
+                    rgb = cls.np[l + 1]
                 else:
-                    rgb = n[0]
-
-                n[l] = rgb
+                    rgb = cls.np[0]
+                cls.np[l] = rgb
                 if cls.rainbow_property.data != 'Fluid Rainbow':
                     break
-                await sleep_ms(1)
+            cls.np.write()
+            await asyncio.sleep_ms(0)
             if cls.rainbow_property.data != 'Fluid Rainbow':
                 break
     finally:
         pass
 
 async def fill_effect(cls, effect):
-    n = cls.np
-    l = cls._leds
     try:
         heaps = [
             (0, 0, 0),
@@ -107,13 +95,13 @@ async def fill_effect(cls, effect):
                 int( 0 ),
                 int( 0 )
             )
-            n[l] = color
+            set_led(cls.np, l, color)
         l = 0
         while True:
             for c in hr:
-                n[l] = heaps[c-1]
+                set_led(cls.np, l, heaps[c-1])
                 l += 1
-                if l >= l:
+                if l >= cls._led:
                     l = 0
                 if cls.rainbow_property.data != 'Lava':
                     break
@@ -226,12 +214,15 @@ class AmbientLight(HomieNode):
 
     def on_rainbow_msg(cls, topic, payload, retained):
         try:
-            if cls.rainbow_property.value == 'Solid Rainbow':
+            rainbow_type = payload
+            if rainbow_type == 'Solid Rainbow':
                 fill_solid_rainbow(cls)
                 return
 
-            elif cls.rainbow_property.value == 'Fluid Rainbow':
+            elif rainbow_type == 'Fluid Rainbow':
+                fill_solid_rainbow(cls)
                 cls._task = asyncio.create_task(fill_fluid_rainbow(cls))
+
                 return
 
             elif cls.rainbow_property.value == 'Lava':
