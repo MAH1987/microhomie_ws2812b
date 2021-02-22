@@ -169,86 +169,86 @@ class AmbientLight(HomieNode):
         )
         self.add_property(self.rainbow_property, self.on_rainbow_msg)
 
-    def on(cls, rgb):
+    def on(self, rgb):
         color = (
-            int(cls._brightness * rgb[0] / 255),
-            int(cls._brightness * rgb[1] / 255),
-            int(cls._brightness * rgb[2] / 255)
+            int(self._brightness * rgb[0] / 255),
+            int(self._brightness * rgb[1] / 255),
+            int(self._brightness * rgb[2] / 255)
         )
-        all_on(cls.np, color=color)
+        all_on(self.np, color=color)
 
-    def on_power_msg(cls, topic, payload, retained):
+    def on_power_msg(self, topic, payload, retained):
         if payload == TRUE:
-            rgb = convert_str_to_rgb(cls.color_property.data)
-            cls.on(rgb=rgb)
+            rgb = convert_str_to_rgb(self.color_property.data)
+            self.on(rgb=rgb)
         elif payload == FALSE:
-            all_off(cls.np)
+            all_off(self.np)
         else:
             return
 
-    def on_color_msg(cls, topic, payload, retained):
+    def on_color_msg(self, topic, payload, retained):
         rgb = convert_str_to_rgb(payload)
         if rgb is not None:
-            cls.rainbow_property.data = 'Aus'
-            if cls.power_property.data == TRUE:
-                cls.on(rgb=rgb)
+            self.rainbow_property.data = 'Aus'
+            if self.power_property.data == TRUE:
+                self.on(rgb=rgb)
 
-    def on_brightness_msg(cls, topic, payload, retained):
+    def on_brightness_msg(self, topic, payload, retained):
         try:
             v = min(max(int(payload), 1), 8)
-            cls._brightness = int(4 + 3.1 * (v + 1) ** 2)
+            self._brightness = int(4 + 3.1 * (v + 1) ** 2)
 
-            if cls.rainbow_property.data == 'Solid Rainbow':
-                fill_solid_rainbow(cls)
-            elif cls.power_property.data == TRUE:
-                rgb = convert_str_to_rgb(cls.color_property.data)
-                cls.on(rgb=rgb)
+            if self.rainbow_property.data == 'Solid Rainbow':
+                fill_solid_rainbow(self)
+            elif self.power_property.data == TRUE:
+                rgb = convert_str_to_rgb(self.color_property.data)
+                self.on(rgb=rgb)
         except ValueError:
             pass
 
-    def on_rainbow_msg(cls, topic, payload, retained):
+    def on_rainbow_msg(self, topic, payload, retained):
         try:
             if payload == 'Solid Rainbow':
-                fill_solid_rainbow(cls)
+                fill_solid_rainbow(self)
                 return
 
             elif payload == 'Fluid Rainbow':
-                fill_solid_rainbow(cls)
-                cls._task = asyncio.create_task(fill_fluid_rainbow(cls))
+                fill_solid_rainbow(self)
+                self._task = asyncio.create_task(fill_fluid_rainbow(self))
 
                 return
 
             elif payload == 'Lava':
-                cls._task = asyncio.create_task(fill_effect(cls, 'Lava'))
+                self._task = asyncio.create_task(fill_effect(self, 'Lava'))
                 return
 
             elif payload == 'ColorFade':
                 # fade in/out
-                rgb = convert_str_to_rgb(cls.color_property.data)
+                rgb = convert_str_to_rgb(self.color_property.data)
 
                 for i in range(0, 1024, 8):
-                    for j in cls._range:
+                    for j in self._range:
                         if (i // 256) % 2 == 0:
                             b = i & 0xff
                         else:
                             b = 255 - (i & 0xff)
 
-                        cls.np[j] = (
+                        self.np[j] = (
                             int( ( rgb[0] / 255 ) * b ),
                             int( ( rgb[1] / 255 ) * b ),
                             int( ( rgb[2] / 255 ) * b )
                         )
-                    cls.np.write()
+                    self.np.write()
 
                 # clear
-                for i in cls._range:
-                    cls.np[i] = (0, 0, 0)
-                cls.np.write()
+                for i in self._range:
+                    self.np[i] = (0, 0, 0)
+                self.np.write()
                 return
 
             else:
-                rgb = convert_str_to_rgb(cls.color_property.data)
-                cls.on(rgb=rgb)
+                rgb = convert_str_to_rgb(self.color_property.data)
+                self.on(rgb=rgb)
                 return
 
         except ValueError:
